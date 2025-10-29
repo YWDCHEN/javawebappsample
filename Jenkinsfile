@@ -18,32 +18,24 @@ node {
       sh 'mvn clean package'
     }
   
-    stage('deploy') {
-      def resourceGroup = 'jenkins-get-started-rg'
-      def webAppName = 'info-sample-app-wendy1234'
-      // login Azure
-      withCredentials([usernamePassword(credentialsId: 'AzureServicePrincipal', passwordVariable: 'AZURE_CLIENT_SECRET', usernameVariable: 'AZURE_CLIENT_ID')]) {
-       sh '''
-       //new change 
-          set -e
-          az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-          az account set -s $AZURE_SUBSCRIPTION_ID
-        '''
-      }
-      //simplify deployment
-      az webapp deploy \
-        --resource-group '"'"${resourceGroup}"'"' \
-        --name '"'"${webAppName}"'"' \
-        --src-path target/calculator-1.0.war \
-        --type war \
-        --async false
-      // get publish settings
-      //def pubProfilesJson = sh script: "az webapp deployment list-publishing-profiles -g $resourceGroup -n $webAppName", returnStdout: true
-      //def ftpProfile = getFtpPublishProfile pubProfilesJson
-      // upload package
-      //sh "curl -T target/calculator-1.0.war $ftpProfile.url/webapps/ROOT.war -u '$ftpProfile.username:$ftpProfile.password'"
-      // log out
-      sh 'az logout'
+   stage('deploy') {
+  withEnv([
+    'RESOURCE_GROUP=jenkins-get-started-rg',
+    'WEBAPP_NAME=info-sample-app-wendy1234'
+  ]) {
+    withCredentials([usernamePassword(
+      credentialsId: 'AzureServicePrincipal',
+      passwordVariable: 'AZURE_CLIENT_SECRET',
+      usernameVariable: 'AZURE_CLIENT_ID'
+    )]) {
+      sh '''
+        set -e
+        az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" -t "$AZURE_TENANT_ID"
+        az account set -s "$AZURE_SUBSCRIPTION_ID"
+        az webapp deploy --resource-group "$RESOURCE_GROUP" --name "$WEBAPP_NAME" --src-path target/calculator-1.0.war --type war --async false
+        az logout
+      '''
     }
   }
 }
+
