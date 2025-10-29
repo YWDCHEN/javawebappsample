@@ -1,16 +1,3 @@
-@Library('') _
-import groovy.json.JsonSlurper
-
-def getFtpPublishProfile(String publishProfilesJson) {
-  def pubProfiles = new JsonSlurper().parseText(publishProfilesJson)
-  for (p in pubProfiles) {
-    if (p.publishMethod == 'FTP') {
-      return [url: p.publishUrl, username: p.userName, password: p.userPWD]
-    }
-  }
-  error('No FTP publishing profile found')
-}
-
 pipeline {
   agent any
 
@@ -47,18 +34,7 @@ pipeline {
             set -e
             az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" -t "$AZURE_TENANT_ID"
             az account set -s "$AZURE_SUBSCRIPTION_ID"
-
-            # Option A: direct deploy (preferred)
-            az webapp deploy \
-              --resource-group "$RESOURCE_GROUP" \
-              --name "$WEBAPP_NAME" \
-              --src-path target/calculator-1.0.war \
-              --type war --async false
-
-            # Option B (fallback): FTP upload using publishing profile
-            # pub=$(az webapp deployment list-publishing-profiles -g "$RESOURCE_GROUP" -n "$WEBAPP_NAME")
-            # echo "$pub" > pub.json
-            # exit 0  # comment this line to enable the FTP fallback below
+            az webapp deploy --resource-group "$RESOURCE_GROUP" --name "$WEBAPP_NAME" --src-path target/calculator-1.0.war --type war --async false
           '''
         }
       }
