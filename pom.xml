@@ -3,22 +3,66 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-
   <groupId>ms.kenchen</groupId>
   <artifactId>calculator</artifactId>
   <version>1.0</version>
   <packaging>war</packaging>
-  <name>calculator</name>
-  <description>Simple Java web app (WAR) built for Azure App Service via Jenkins</description>
-
-  <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <!-- Compile to Java 11 bytecode (runs on App Service Tomcat 8) even if the JDK is 17 -->
-    <maven.compiler.release>11</maven.compiler.release>
-  </properties>
-
+  <build>
+    <plugins>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>2.3.2</version>
+        <configuration>
+          <source>11</source>
+          <target>11</target>
+        </configuration>
+      </plugin>    
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-war-plugin</artifactId>
+        <version>2.1.1</version>
+      </plugin>
+      <plugin>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-maven-plugin</artifactId>
+        <version>9.2.9.v20150224</version>
+        <configuration>
+          <webApp>
+            <contextPath>/</contextPath>
+          </webApp>
+          <webAppSourceDirectory>target/${project.artifactId}-${project.version}</webAppSourceDirectory>
+          <stopPort>8079</stopPort>
+          <stopKey>stopit</stopKey>
+          <stopWait>10</stopWait>
+          <httpConnector>
+            <!--<port>8080</port>-->
+            <idleTimeout>60000</idleTimeout>
+          </httpConnector>
+        </configuration>
+        <executions>
+          <execution>
+            <id>start-jetty</id>
+            <phase>pre-integration-test</phase>
+            <goals>
+              <goal>start</goal>
+            </goals>
+            <configuration>
+              <scanIntervalSeconds>0</scanIntervalSeconds>
+              <daemon>true</daemon>
+            </configuration>
+          </execution>
+          <execution>
+            <id>stop-jetty</id>
+            <phase>post-integration-test</phase>
+            <goals>
+              <goal>stop</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
   <dependencies>
-    <!-- Jersey / JAX-RS (versions kept to match your existing code) -->
     <dependency>
       <groupId>org.glassfish.jersey.containers</groupId>
       <artifactId>jersey-container-servlet-core</artifactId>
@@ -34,68 +78,5 @@
       <artifactId>jersey-server</artifactId>
       <version>2.22.2</version>
     </dependency>
-
-    <!-- Servlet API provided by the container (Tomcat) -->
-    <dependency>
-      <groupId>javax.servlet</groupId>
-      <artifactId>javax.servlet-api</artifactId>
-      <version>4.0.1</version>
-      <scope>provided</scope>
-    </dependency>
   </dependencies>
-
-  <build>
-    <plugins>
-      <!-- Modern compiler plugin; uses 'release' to enforce Java 11 bytecode -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.11.0</version>
-        <configuration>
-          <release>${maven.compiler.release}</release>
-        </configuration>
-      </plugin>
-
-      <!-- Modern WAR plugin (fixes the XStream/Properties error on JDK 17) -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-war-plugin</artifactId>
-        <version>3.4.0</version>
-        <configuration>
-          <!-- If you don't have a web.xml or use annotations, keep false.
-               If you *do* have web.xml already, this doesn't hurt. -->
-          <failOnMissingWebXml>false</failOnMissingWebXml>
-        </configuration>
-      </plugin>
-
-      <!-- Optional: quieter, predictable test phase (no tests in project anyway) -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <version>2.22.2</version>
-      </plugin>
-
-      <!-- Optional: fail fast if someone builds with too old a JDK -->
-      <!--
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <version>3.4.1</version>
-        <executions>
-          <execution>
-            <id>enforce-java</id>
-            <goals><goal>enforce</goal></goals>
-            <configuration>
-              <rules>
-                <requireJavaVersion>
-                  <version>[11,)</version>
-                </requireJavaVersion>
-              </rules>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      -->
-    </plugins>
-  </build>
 </project>
