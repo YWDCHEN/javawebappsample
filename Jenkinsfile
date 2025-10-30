@@ -1,50 +1,40 @@
-pipeline {
-  agent any
+import groovy.json.JsonSlurper
 
-  environment {
-    AZURE_SUBSCRIPTION_ID = 'bfb0b70b-5e49-4b79-960e-766bb1e40f20'
-    AZURE_TENANT_ID       = 'fb1ff8fb-edd0-483c-82b0-fa0da479f2b3'
-    RESOURCE_GROUP        = 'jenkins-get-started-rg'
-    WEBAPP_NAME           = 'info-sample-app-wendy1234'
-  }
+def getFtpPublishProfile(def publishProfilesJson) {
+  def pubProfiles = new JsonSlurper().parseText(publishProfilesJson)
+  for (p in pubProfiles)
+    if (p['publishMethod'] == 'FTP')
+      return [url: p.publishUrl, username: p.userName, password: p.userPWD]
+}
 
-  stages {
+node {
+  withEnv(['AZURE_SUBSCRIPTION_ID=bfb0b70b-5e49-4b79-960e-766bb1e40f20',
+        'AZURE_TENANT_ID=fb1ff8fb-edd0-483c-82b0-fa0da479f2b3']) {
     stage('init') {
-      steps {
-        checkout scm
-      }
+      checkout scm
     }
-
+  
     stage('build') {
-      steps {
-        sh 'mvn -v'
-        sh 'mvn clean package'
-        sh 'ls -l target || true'
-      }
+      sh 'mvn clean package'
     }
-
+  
     stage('deploy') {
-      steps {
-        withCredentials([usernamePassword(
-          credentialsId: 'AzureServicePrincipal',
-          usernameVariable: 'AZURE_CLIENT_ID',
-          passwordVariable: 'AZURE_CLIENT_SECRET'
-        )]) {
-          sh '''
-            set -e
-            az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" -t "$AZURE_TENANT_ID"
-            az account set -s "$AZURE_SUBSCRIPTION_ID"
-            az webapp deploy --resource-group "$RESOURCE_GROUP" --name "$WEBAPP_NAME" --src-path target/calculator-1.0.war --type war --async false
-          '''
-        }
+      def resourceGroup = 'jenkins-get-started-rg'
+      def webAppName = 'ywdchenApp'
+      // login Azure
+      withCredentials([usernamePassword(credentialsId: 'AzureServicePrincipal', passwordVariable: 'AZURE_CLIENT_SECRET', usernameVariable: 'AZURE_CLIENT_ID')]) {
+       sh '''
+          az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+          az account set -s $AZURE_SUBSCRIPTION_ID
+        '''
       }
-    }
-  }
-
-  post {
-    always {
-      sh 'echo "Build artifacts:" && ls -l target || true'
-      sh 'az logout || true'
+      // get publish settings
+      def pubProfilesJson = sh script: "az webapp deployment list-publishing-profiles -g $resourceGroup -n $webAppName", returnStdout: true
+      def ftpProfile = getFtpPublishProfile pubProfilesJson
+      // upload package
+      sh "curl -T target/calculator-1.0.war $ftpProfile.url/webapps/ROOT.war -u '$ftpProfile.username:$ftpProfile.password'"
+      // log out
+      sh 'az logout'
     }
   }
 }
